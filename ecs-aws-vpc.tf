@@ -70,7 +70,7 @@ resource "aws_flow_log" "flowlog_s3" {
 }
 
 //*******************************************
-// VPC ENDPOINTS - Updated to use security group
+// VPC ENDPOINTS FOR AWS SERVICES
 //*******************************************
 
 # Secrets Manager VPC Endpoint
@@ -80,7 +80,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
   subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]  # Uses new SG
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
 
   tags = {
     Name = "${var.client_name}-secretsmanager-endpoint"
@@ -138,45 +138,5 @@ resource "aws_vpc_endpoint" "s3" {
 
   tags = {
     Name = "${var.client_name}-s3-endpoint"
-  }
-}
-
-# ECS VPC Endpoints
-resource "aws_vpc_endpoint" "ecs" {
-  vpc_id              = aws_vpc.vpc.id
-  service_name        = "com.amazonaws.${var.aws_region}.ecs"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.client_name}-ecs-endpoint"
-  }
-}
-
-resource "aws_vpc_endpoint" "ecs_agent" {
-  vpc_id              = aws_vpc.vpc.id
-  service_name        = "com.amazonaws.${var.aws_region}.ecs-agent"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.client_name}-ecs-agent-endpoint"
-  }
-}
-
-resource "aws_vpc_endpoint" "ecs_telemetry" {
-  vpc_id              = aws_vpc.vpc.id
-  service_name        = "com.amazonaws.${var.aws_region}.ecs-telemetry"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.client_name}-ecs-telemetry-endpoint"
   }
 }
