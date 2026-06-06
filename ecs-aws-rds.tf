@@ -1,7 +1,3 @@
-//*******************************************
-// RDS — MySQL 8.4 for Moodle
-//*******************************************
-
 resource "aws_db_instance" "moodle" {
   identifier            = "${var.client_name}-moodle-db"
   engine                = "mysql"
@@ -33,7 +29,7 @@ resource "aws_db_instance" "moodle" {
   monitoring_interval = 60
   monitoring_role_arn = aws_iam_role.rds_monitoring.arn
 
-  performance_insights_enabled = true
+  performance_insights_enabled = false  # ← Changed to false
 
   deletion_protection      = var.deletion_protection
   delete_automated_backups = false
