@@ -68,3 +68,135 @@ resource "aws_flow_log" "flowlog_s3" {
   vpc_id               = aws_vpc.vpc.id
   tags = { Name = "${var.client_name}_s3_flowlog" }
 }
+
+//*******************************************
+// VPC ENDPOINTS FOR AWS SERVICES
+//*******************************************
+
+# Security Group for VPC Endpoints
+resource "aws_security_group" "vpc_endpoints" {
+  name_prefix = "${var.client_name}-vpc-endpoints-"
+  description = "Security group for VPC endpoints"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.vpc.cidr_block]
+  }
+
+  tags = {
+    Name = "${var.client_name}-vpc-endpoints-sg"
+  }
+}
+
+# Secrets Manager VPC Endpoint
+resource "aws_vpc_endpoint" "secretsmanager" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.secretsmanager"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-secretsmanager-endpoint"
+  }
+}
+
+# ECR API VPC Endpoint
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-ecr-api-endpoint"
+  }
+}
+
+# ECR Docker VPC Endpoint
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-ecr-dkr-endpoint"
+  }
+}
+
+# CloudWatch Logs VPC Endpoint (for ECS task logging)
+resource "aws_vpc_endpoint" "logs" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.logs"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-logs-endpoint"
+  }
+}
+
+# S3 Gateway Endpoint (for ECR image layers)
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.vpc.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private.id]
+
+  tags = {
+    Name = "${var.client_name}-s3-endpoint"
+  }
+}
+
+# Optional: ECS Agent VPC Endpoint (if needed)
+resource "aws_vpc_endpoint" "ecs_agent" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecs-agent"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-ecs-agent-endpoint"
+  }
+}
+
+# Optional: ECS Telemetry VPC Endpoint
+resource "aws_vpc_endpoint" "ecs_telemetry" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecs-telemetry"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-ecs-telemetry-endpoint"
+  }
+}
+
+# Optional: ECS VPC Endpoint
+resource "aws_vpc_endpoint" "ecs" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecs"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-ecs-endpoint"
+  }
+}
