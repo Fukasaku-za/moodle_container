@@ -51,6 +51,18 @@ variable "vpc_cidr" {
   default     = "10.0"
 }
 
+variable "private_subnet_ids" {
+  description = "List of private subnet IDs for VPC endpoints"
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_vpc_endpoints" {
+  description = "Enable VPC endpoints for AWS services (Secrets Manager, ECR, CloudWatch)"
+  type        = bool
+  default     = true
+}
+
 // ── ECS / Container ───────────────────────
 variable "moodle_image" {
   type        = string
@@ -101,8 +113,9 @@ variable "moodle_admin_email" {
 
 // ── Database ──────────────────────────────
 variable "db_instance_class" {
-  type    = string
-  default = "db.t3.small"
+  type        = string
+  default     = "db.t3.small"
+  description = "RDS instance class (must be t3.small or larger for Performance Insights)"
 }
 
 variable "db_allocated_storage" {
@@ -154,6 +167,12 @@ variable "db_snapshot_identifier" {
 variable "deletion_protection" {
   type    = bool
   default = true
+}
+
+variable "enable_performance_insights" {
+  description = "Enable RDS Performance Insights (requires t3.small or larger)"
+  type        = bool
+  default     = true
 }
 
 // ── ALB ───────────────────────────────────
