@@ -70,26 +70,8 @@ resource "aws_flow_log" "flowlog_s3" {
 }
 
 //*******************************************
-// VPC ENDPOINTS FOR AWS SERVICES
+// VPC ENDPOINTS - Updated to use security group
 //*******************************************
-
-# Security Group for VPC Endpoints
-resource "aws_security_group" "vpc_endpoints" {
-  name_prefix = "${var.client_name}-vpc-endpoints-"
-  description = "Security group for VPC endpoints"
-  vpc_id      = aws_vpc.vpc.id
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [aws_vpc.vpc.cidr_block]
-  }
-
-  tags = {
-    Name = "${var.client_name}-vpc-endpoints-sg"
-  }
-}
 
 # Secrets Manager VPC Endpoint
 resource "aws_vpc_endpoint" "secretsmanager" {
@@ -98,7 +80,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
   subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]  # Uses new SG
 
   tags = {
     Name = "${var.client_name}-secretsmanager-endpoint"
@@ -133,7 +115,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   }
 }
 
-# CloudWatch Logs VPC Endpoint (for ECS task logging)
+# CloudWatch Logs VPC Endpoint
 resource "aws_vpc_endpoint" "logs" {
   vpc_id              = aws_vpc.vpc.id
   service_name        = "com.amazonaws.${var.aws_region}.logs"
@@ -147,7 +129,7 @@ resource "aws_vpc_endpoint" "logs" {
   }
 }
 
-# S3 Gateway Endpoint (for ECR image layers)
+# S3 Gateway Endpoint
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.vpc.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"
@@ -159,7 +141,20 @@ resource "aws_vpc_endpoint" "s3" {
   }
 }
 
-# Optional: ECS Agent VPC Endpoint (if needed)
+# ECS VPC Endpoints
+resource "aws_vpc_endpoint" "ecs" {
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecs"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+
+  tags = {
+    Name = "${var.client_name}-ecs-endpoint"
+  }
+}
+
 resource "aws_vpc_endpoint" "ecs_agent" {
   vpc_id              = aws_vpc.vpc.id
   service_name        = "com.amazonaws.${var.aws_region}.ecs-agent"
@@ -173,7 +168,6 @@ resource "aws_vpc_endpoint" "ecs_agent" {
   }
 }
 
-# Optional: ECS Telemetry VPC Endpoint
 resource "aws_vpc_endpoint" "ecs_telemetry" {
   vpc_id              = aws_vpc.vpc.id
   service_name        = "com.amazonaws.${var.aws_region}.ecs-telemetry"
@@ -184,19 +178,5 @@ resource "aws_vpc_endpoint" "ecs_telemetry" {
 
   tags = {
     Name = "${var.client_name}-ecs-telemetry-endpoint"
-  }
-}
-
-# Optional: ECS VPC Endpoint
-resource "aws_vpc_endpoint" "ecs" {
-  vpc_id              = aws_vpc.vpc.id
-  service_name        = "com.amazonaws.${var.aws_region}.ecs"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = {
-    Name = "${var.client_name}-ecs-endpoint"
   }
 }
