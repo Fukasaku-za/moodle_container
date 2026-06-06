@@ -2,9 +2,6 @@
 // ALB — Application Load Balancer
 //*******************************************
 
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
-
 resource "aws_lb" "moodle" {
   name               = "${var.client_name}-moodle-alb"
   internal           = false
