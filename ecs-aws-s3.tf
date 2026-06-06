@@ -94,7 +94,10 @@ data "aws_iam_policy_document" "alb_logs" {
     effect  = "Deny"
     actions = ["s3:*"]
     resources = [aws_s3_bucket.alb_logs.arn, "${aws_s3_bucket.alb_logs.arn}/*"]
-    principals { type = "AWS"; identifiers = ["*"] }
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
     condition {
       test     = "Bool"
       variable = "aws:SecureTransport"
@@ -161,7 +164,10 @@ data "aws_iam_policy_document" "flowlog_s3" {
     effect  = "Allow"
     actions = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.flowlog.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
-    principals { type = "Service"; identifiers = ["delivery.logs.amazonaws.com"] }
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
     condition {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
@@ -178,7 +184,10 @@ data "aws_iam_policy_document" "flowlog_s3" {
     effect  = "Allow"
     actions = ["s3:GetBucketAcl"]
     resources = [aws_s3_bucket.flowlog.arn]
-    principals { type = "Service"; identifiers = ["delivery.logs.amazonaws.com"] }
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
     condition {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
@@ -190,7 +199,10 @@ data "aws_iam_policy_document" "flowlog_s3" {
     effect  = "Deny"
     actions = ["s3:*"]
     resources = [aws_s3_bucket.flowlog.arn, "${aws_s3_bucket.flowlog.arn}/*"]
-    principals { type = "AWS"; identifiers = ["*"] }
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
     condition {
       test     = "Bool"
       variable = "aws:SecureTransport"
