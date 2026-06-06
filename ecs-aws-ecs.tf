@@ -128,7 +128,12 @@ resource "aws_ecs_service" "moodle" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    # Using your actual private subnet names
+    subnets = [
+      aws_subnet.private_a.id,
+      aws_subnet.private_b.id,
+      aws_subnet.private_c.id
+    ]
     security_groups  = [aws_security_group.ecs_tasks.id]
     assign_public_ip = false
   }
