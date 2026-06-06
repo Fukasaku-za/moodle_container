@@ -49,11 +49,13 @@ resource "aws_security_group" "ecs_tasks" {
     description     = "HTTP from ALB"
   }
 
+  # Allow all outbound traffic (required for VPC endpoints, RDS, EFS, etc.)
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
   }
 
   lifecycle { create_before_destroy = true }
@@ -108,4 +110,39 @@ resource "aws_security_group" "efs" {
 
   lifecycle { create_before_destroy = true }
   tags = { Name = "${var.client_name}_efs_sg" }
+}
+
+// VPC Endpoints — allow HTTPS from ECS tasks
+resource "aws_security_group" "vpc_endpoints" {
+  name        = "${var.client_name}_vpc_endpoints_sg"
+  description = "VPC Endpoints: HTTPS from VPC resources"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs_tasks.id]
+    description     = "HTTPS from ECS tasks"
+  }
+
+  # Allow from entire VPC as fallback
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.vpc.cidr_block]
+    description = "HTTPS from VPC"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
+  }
+
+  lifecycle { create_before_destroy = true }
+  tags = { Name = "${var.client_name}_vpc_endpoints_sg" }
 }
