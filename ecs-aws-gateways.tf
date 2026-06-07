@@ -105,7 +105,29 @@ resource "aws_default_security_group" "default" {
   tags = { Name = "default_sg_do_not_use" }
 }
 
+// Default NACL governs every subnet (none are associated with a custom NACL).
+// An empty block denies all traffic, so explicit allow rules are required here.
+// Security groups remain the stateful enforcement layer.
 resource "aws_default_network_acl" "default" {
   default_network_acl_id = aws_vpc.vpc.default_network_acl_id
-  tags = { Name = "default_nacl_do_not_use" }
+
+  ingress {
+    protocol   = "-1"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  egress {
+    protocol   = "-1"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  tags = { Name = "${var.client_name}_default_nacl" }
 }
