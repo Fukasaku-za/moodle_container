@@ -128,14 +128,15 @@ resource "aws_ecs_service" "moodle" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    # Using your actual private subnet names
+    # TEMPORARY: Using public subnets with public IPs to resolve network issues
+    # TODO: Switch back to private subnets once NAT Gateway/VPC Endpoints are verified
     subnets = [
-      aws_subnet.private_a.id,
-      aws_subnet.private_b.id,
-      aws_subnet.private_c.id
+      aws_subnet.public_a.id,
+      aws_subnet.public_b.id,
+      aws_subnet.public_c.id
     ]
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = true  # Required for public subnets to access internet
   }
 
   load_balancer {
