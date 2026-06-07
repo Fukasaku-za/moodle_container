@@ -16,16 +16,6 @@ resource "aws_ecs_cluster" "moodle" {
   }
 }
 
-// ── CloudWatch Log Group for Moodle App ──
-resource "aws_cloudwatch_log_group" "moodle_app" {
-  name              = "/ecs/${var.client_name}-moodle"
-  retention_in_days = var.retention_days
-
-  tags = {
-    Name = "${var.client_name}-moodle-logs"
-  }
-}
-
 // ── ECS Task Definition ──────────────────
 resource "aws_ecs_task_definition" "moodle" {
   family                   = "${var.client_name}-moodle"
@@ -39,7 +29,7 @@ resource "aws_ecs_task_definition" "moodle" {
   container_definitions = jsonencode([
     {
       name  = "moodle"
-      image = var.moodle_image
+      image = "public.ecr.aws/bitnami/moodle:5.2.0-debian-12-r4"  # ECR Public image
       portMappings = [
         {
           containerPort = 8080
@@ -47,7 +37,7 @@ resource "aws_ecs_task_definition" "moodle" {
         }
       ]
 
-      # Using environment variables directly (bypassing Secrets Manager)
+      # Using environment variables directly
       environment = [
         {
           name  = "MOODLE_DATABASE_TYPE"
@@ -102,23 +92,8 @@ resource "aws_ecs_task_definition" "moodle" {
           value = "true"
         }
       ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.moodle_app.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "moodle"
-        }
-      }
     }
   ])
-
-  # Ensure log group and IAM permissions exist before task definition
-  depends_on = [
-    aws_cloudwatch_log_group.moodle_app,
-    aws_iam_role_policy.ecs_execution_cloudwatch
-  ]
 
   tags = {
     Name = "${var.client_name}-moodle-task-def"
@@ -132,9 +107,10 @@ resource "aws_ecs_service" "moodle" {
   task_definition = aws_ecs_task_definition.moodle.arn
   desired_count   = var.ecs_desired_count
   launch_type     = "FARGATE"
+  
+  enable_execute_command = true
 
   network_configuration {
-    # Using private subnets with VPC endpoints for production
     subnets = [
       aws_subnet.private_a.id,
       aws_subnet.private_b.id,
@@ -152,8 +128,6 @@ resource "aws_ecs_service" "moodle" {
 
   depends_on = [
     aws_lb_listener.https,
-    aws_iam_role_policy.ecs_execution_cloudwatch,
-    aws_vpc_endpoint.logs,
     aws_vpc_endpoint.ecr_api,
     aws_vpc_endpoint.ecr_dkr
   ]
