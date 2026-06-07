@@ -29,7 +29,7 @@ resource "aws_ecs_task_definition" "moodle" {
   container_definitions = jsonencode([
     {
       name  = "moodle"
-      image = "public.ecr.aws/bitnami/moodle:5.2.0-debian-12-r4"
+      image = "627031162962.dkr.ecr.af-south-1.amazonaws.com/oneconnect/moodle:latest"
       portMappings = [
         {
           containerPort = 8080
@@ -110,14 +110,14 @@ resource "aws_ecs_service" "moodle" {
   enable_execute_command = true
 
   network_configuration {
-    # Using public subnets with public IPs for internet access
+    # Use private subnets since ECR access works through VPC endpoints
     subnets = [
-      aws_subnet.public_a.id,
-      aws_subnet.public_b.id,
-      aws_subnet.public_c.id
+      aws_subnet.private_a.id,
+      aws_subnet.private_b.id,
+      aws_subnet.private_c.id
     ]
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   load_balancer {
@@ -127,7 +127,9 @@ resource "aws_ecs_service" "moodle" {
   }
 
   depends_on = [
-    aws_lb_listener.https
+    aws_lb_listener.https,
+    aws_vpc_endpoint.ecr_api,
+    aws_vpc_endpoint.ecr_dkr
   ]
 
   tags = {
