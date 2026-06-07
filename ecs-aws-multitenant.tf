@@ -115,6 +115,15 @@ resource "aws_db_instance" "tenant" {
   }
 }
 
+// ── Tenant Log Groups ─────────────────────
+resource "aws_cloudwatch_log_group" "tenant" {
+  for_each = var.new_clients
+
+  name              = "/ecs/${each.key}-moodle"
+  retention_in_days = 30
+  tags              = { Client = each.key }
+}
+
 // ── Tenant Task Definitions ───────────────
 resource "aws_ecs_task_definition" "tenant" {
   for_each = var.new_clients
@@ -146,8 +155,24 @@ resource "aws_ecs_task_definition" "tenant" {
         { name = "MOODLE_SITE_NAME", value = each.value.site_name },
         { name = "MOODLE_URL", value = "https://${each.value.subdomain}.${var.saas_domain}" },
         { name = "MOODLE_SKIP_BOOTSTRAP", value = "no" },
-        { name = "BITNAMI_DEBUG", value = "true" }
+        { name = "BITNAMI_DEBUG", value = "true" },
+        // Moodle sits behind the ALB which terminates TLS — without these
+        // it builds http:// URLs and can redirect-loop after it boots.
+        { name = "MOODLE_REVERSEPROXY", value = "yes" },
+        { name = "MOODLE_SSLPROXY", value = "yes" }
       ]
+
+      // Send stdout/stderr to CloudWatch so failures are visible.
+      // Execution role's AmazonECSTaskExecutionRolePolicy already grants
+      // CreateLogStream + PutLogEvents; the group is pre-created below.
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.tenant[each.key].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "moodle"
+        }
+      }
     }
   ])
 
