@@ -79,7 +79,11 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   service_name        = "com.amazonaws.${var.aws_region}.secretsmanager"
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
+  subnet_ids = [
+    aws_subnet.private_a.id,
+    aws_subnet.private_b.id,
+    aws_subnet.private_c.id
+  ]
   security_group_ids  = [aws_security_group.vpc_endpoints.id]
 
   tags = {
@@ -93,7 +97,11 @@ resource "aws_vpc_endpoint" "ecr_api" {
   service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
+  subnet_ids = [
+    aws_subnet.private_a.id,
+    aws_subnet.private_b.id,
+    aws_subnet.private_c.id
+  ]
   security_group_ids  = [aws_security_group.vpc_endpoints.id]
 
   tags = {
@@ -107,7 +115,11 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
+  subnet_ids = [
+    aws_subnet.private_a.id,
+    aws_subnet.private_b.id,
+    aws_subnet.private_c.id
+  ]
   security_group_ids  = [aws_security_group.vpc_endpoints.id]
 
   tags = {
@@ -121,7 +133,11 @@ resource "aws_vpc_endpoint" "logs" {
   service_name        = "com.amazonaws.${var.aws_region}.logs"
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
-  subnet_ids          = var.private_subnet_ids
+  subnet_ids = [
+    aws_subnet.private_a.id,
+    aws_subnet.private_b.id,
+    aws_subnet.private_c.id
+  ]
   security_group_ids  = [aws_security_group.vpc_endpoints.id]
 
   tags = {
