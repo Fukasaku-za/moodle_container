@@ -29,7 +29,7 @@ resource "aws_ecs_task_definition" "moodle" {
   container_definitions = jsonencode([
     {
       name  = "moodle"
-      image = "public.ecr.aws/bitnami/moodle:5.2.0-debian-12-r4"  # ECR Public image
+      image = "public.ecr.aws/bitnami/moodle:5.2.0-debian-12-r4"
       portMappings = [
         {
           containerPort = 8080
@@ -37,7 +37,6 @@ resource "aws_ecs_task_definition" "moodle" {
         }
       ]
 
-      # Using environment variables directly
       environment = [
         {
           name  = "MOODLE_DATABASE_TYPE"
@@ -111,13 +110,14 @@ resource "aws_ecs_service" "moodle" {
   enable_execute_command = true
 
   network_configuration {
+    # Using public subnets with public IPs for internet access
     subnets = [
-      aws_subnet.private_a.id,
-      aws_subnet.private_b.id,
-      aws_subnet.private_c.id
+      aws_subnet.public_a.id,
+      aws_subnet.public_b.id,
+      aws_subnet.public_c.id
     ]
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -127,9 +127,7 @@ resource "aws_ecs_service" "moodle" {
   }
 
   depends_on = [
-    aws_lb_listener.https,
-    aws_vpc_endpoint.ecr_api,
-    aws_vpc_endpoint.ecr_dkr
+    aws_lb_listener.https
   ]
 
   tags = {
