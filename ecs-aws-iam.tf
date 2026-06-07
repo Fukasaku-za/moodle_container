@@ -48,30 +48,6 @@ data "aws_iam_policy_document" "ecs_execution_secrets" {
   }
 }
 
-// Additional CloudWatch permissions for execution role
-resource "aws_iam_role_policy" "ecs_execution_cloudwatch" {
-  name   = "${var.client_name}_ecs_execution_cloudwatch"
-  role   = aws_iam_role.ecs_execution.id
-  policy = data.aws_iam_policy_document.ecs_execution_cloudwatch.json
-}
-
-data "aws_iam_policy_document" "ecs_execution_cloudwatch" {
-  statement {
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-      "logs:DescribeLogGroups",
-      "logs:DescribeLogStreams",
-    ]
-    resources = [
-      aws_cloudwatch_log_group.moodle_app.arn,
-      "${aws_cloudwatch_log_group.moodle_app.arn}:*"
-    ]
-  }
-}
-
 // ── Task role ─────────────────────────────
 // Used by the running Moodle container itself.
 // Grants CloudWatch Logs, SSM exec, and EFS access.
@@ -88,22 +64,6 @@ resource "aws_iam_role_policy" "ecs_task_policy" {
 }
 
 data "aws_iam_policy_document" "ecs_task_permissions" {
-  // CloudWatch Logs
-  statement {
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-      "logs:DescribeLogGroups",
-      "logs:DescribeLogStreams",
-    ]
-    resources = [
-      aws_cloudwatch_log_group.moodle_app.arn,
-      "${aws_cloudwatch_log_group.moodle_app.arn}:*"
-    ]
-  }
-
   // ECS Exec (allows `aws ecs execute-command` for debugging)
   statement {
     effect = "Allow"
