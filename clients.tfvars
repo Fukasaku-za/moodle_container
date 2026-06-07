@@ -5,16 +5,18 @@
 
 saas_domain = "learngrc.xyz"
 
+
+# client identifier = "macadonia", served at hero.learngrc.xyz
 new_clients = {
-  # client identifier = "macadonia", served at hero.learngrc.xyz
   macadonia = {
     subdomain   = "hero"
-    image       = "bitnami/moodle:latest" # switch to ECR URI after first push
+    image       = "627031162962.dkr.ecr.af-south-1.amazonaws.com/oneconnect/moodle:macadonia-latest"
     site_name   = "Macadonia"
     admin_user  = "admin"
-    admin_email = "admin@hero.learngrc.xyz"
+    admin_email = "lwanda@untu2clud.co.za"
     priority    = 100
   }
+}
 
   # add the next client by appending another block, e.g.:
   # nova = {
@@ -30,12 +32,12 @@ new_clients = {
 //*******************************************
 // Secrets — DO NOT put them above. Export before apply:
 //
-//   export TF_VAR_client_secrets='{
-//     "macadonia": {
-//       "admin_password": "REPLACE_ME",
-//       "db_password":    "REPLACE_ME"
-//     }
-//   }'
+   export TF_VAR_client_secrets='{
+     "macadonia": {
+       "admin_password": "Pa$$w0rd2026!",
+       "db_password":    "Pa$$w0rd2026!"
+     }
+   }'
 //
 // (every key in new_clients needs a matching entry here)
 //*******************************************
