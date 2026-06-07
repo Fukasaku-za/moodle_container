@@ -114,6 +114,12 @@ resource "aws_ecs_task_definition" "moodle" {
     }
   ])
 
+  # Ensure log group and IAM permissions exist before task definition
+  depends_on = [
+    aws_cloudwatch_log_group.moodle_app,
+    aws_iam_role_policy.ecs_execution_cloudwatch
+  ]
+
   tags = {
     Name = "${var.client_name}-moodle-task-def"
   }
@@ -128,15 +134,14 @@ resource "aws_ecs_service" "moodle" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    # TEMPORARY: Using public subnets with public IPs to resolve network issues
-    # TODO: Switch back to private subnets once NAT Gateway/VPC Endpoints are verified
+    # Using private subnets with VPC endpoints for production
     subnets = [
-      aws_subnet.public_a.id,
-      aws_subnet.public_b.id,
-      aws_subnet.public_c.id
+      aws_subnet.private_a.id,
+      aws_subnet.private_b.id,
+      aws_subnet.private_c.id
     ]
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = true  # Required for public subnets to access internet
+    assign_public_ip = false
   }
 
   load_balancer {
@@ -147,7 +152,10 @@ resource "aws_ecs_service" "moodle" {
 
   depends_on = [
     aws_lb_listener.https,
-    aws_iam_role_policy.ecs_execution_secrets
+    aws_iam_role_policy.ecs_execution_cloudwatch,
+    aws_vpc_endpoint.logs,
+    aws_vpc_endpoint.ecr_api,
+    aws_vpc_endpoint.ecr_dkr
   ]
 
   tags = {
