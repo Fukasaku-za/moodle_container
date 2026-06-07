@@ -155,11 +155,9 @@ resource "aws_ecs_task_definition" "tenant" {
         { name = "MOODLE_SITE_NAME", value = each.value.site_name },
         { name = "MOODLE_URL", value = "https://${each.value.subdomain}.${var.saas_domain}" },
         { name = "MOODLE_SKIP_BOOTSTRAP", value = "no" },
-        { name = "BITNAMI_DEBUG", value = "true" },
+        { name = "BITNAMI_DEBUG", value = "true" }
         // Moodle sits behind the ALB which terminates TLS — without these
         // it builds http:// URLs and can redirect-loop after it boots.
-        { name = "MOODLE_REVERSEPROXY", value = "yes" },
-        { name = "MOODLE_SSLPROXY", value = "yes" }
       ]
 
       // Send stdout/stderr to CloudWatch so failures are visible.
