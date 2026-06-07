@@ -129,12 +129,6 @@ resource "aws_vpc_endpoint" "logs" {
   }
 }
 
-variable "enable_vpc_endpoints" {
-  description = "Enable VPC endpoints for AWS services"
-  type        = bool
-  default     = true
-}
-
 # S3 Gateway Endpoint
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.vpc.id
