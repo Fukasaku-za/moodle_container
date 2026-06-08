@@ -1,15 +1,14 @@
 //*******************************************
 // MULTI-TENANT ECS — NEW CLIENTS (for_each)
 //
-// IMPORTANT: This intentionally does NOT touch the existing oneconnect
-// resources (aws_ecs_service.moodle, aws_db_instance.moodle, etc.).
-// Those keep serving app.learngrc.xyz exactly as today. Only NEW tenants
-// are driven through the map below, so applying this cannot disturb the
-// live site or the live database.
+// IMPORTANT: This does NOT modify the existing oneconnect Terraform
+// resources. New tenants SHARE the existing aws_db_instance.moodle, but
+// each gets its own database + user created inside it at container startup,
+// so oneconnect's "moodle" database is never touched. The live site at
+// app.learngrc.xyz keeps serving via the listener's default_action.
 //
-// To add a client: add an entry to var.new_clients + var.client_secrets,
-// then `terraform apply`. DNS for the new subdomain points at the SAME
-// shared ALB (aws_lb.moodle) — output alb_dns_name.
+// Per client you: (1) set vars in new_clients + client_secrets, (2) apply,
+// (3) push that client's image to its new ECR repo, (4) force a deploy.
 //*******************************************
 
 // ── Tenant Target Groups ──────────────────
@@ -59,61 +58,54 @@ resource "aws_lb_listener_rule" "tenant" {
   }
 }
 
-// ── Tenant Databases (one isolated RDS per tenant) ────
-// Reuses the shared subnet group / parameter group / monitoring role / SG.
-// Set shared_database=true logic instead if you prefer one RDS for all.
-resource "aws_db_instance" "tenant" {
+// ── Tenant ECR Repositories (one repo per client) ─────
+// Each client gets its own repo: <client>/moodle. Push that client's
+// image here, then the task definition below pulls from it by tag.
+resource "aws_ecr_repository" "tenant" {
   for_each = var.new_clients
 
-  identifier            = "${each.key}-moodle-db"
-  engine                = "mysql"
-  engine_version        = var.db_engine_version
-  instance_class        = var.db_instance_class
-  allocated_storage     = var.db_allocated_storage
-  max_allocated_storage = var.db_max_allocated_storage
-  storage_type          = "gp3"
-  storage_encrypted     = true
+  name                 = "${each.key}/moodle"
+  image_tag_mutability = "MUTABLE"
 
-  db_name  = each.value.db_name
-  username = each.value.db_username
-  password = var.client_secrets[each.key].db_password // sensitive, from TF_VAR
-  port     = var.db_port
-
-  multi_az            = false
-  publicly_accessible = false
-
-  db_subnet_group_name   = aws_db_subnet_group.moodle.name
-  vpc_security_group_ids = [aws_security_group.rds.id]
-  parameter_group_name   = aws_db_parameter_group.moodle.name
-
-  enabled_cloudwatch_logs_exports = ["error", "general", "slowquery"]
-  auto_minor_version_upgrade      = true
-  maintenance_window              = "Sun:00:00-Sun:01:00"
-
-  monitoring_interval = 60
-  monitoring_role_arn = aws_iam_role.rds_monitoring.arn
-
-  performance_insights_enabled = false
-
-  deletion_protection       = var.deletion_protection
-  delete_automated_backups  = false
-  skip_final_snapshot       = false
-  final_snapshot_identifier = "${each.key}-moodle-db-final"
-  copy_tags_to_snapshot     = true
-  apply_immediately         = false
-
-  tags = {
-    Name        = "${each.key}_moodle_db"
-    Environment = var.environment
-    Client      = each.key
+  image_scanning_configuration {
+    scan_on_push = true
   }
 
-  timeouts {
-    create = "2h"
-    update = "2h"
-    delete = "2h"
+  encryption_configuration {
+    encryption_type = "AES256"
   }
+
+  tags = { Name = "${each.key}_moodle_ecr", Client = each.key }
 }
+
+resource "aws_ecr_lifecycle_policy" "tenant" {
+  for_each = var.new_clients
+
+  repository = aws_ecr_repository.tenant[each.key].name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Remove untagged images after 1 day"
+        selection    = { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 1 }
+        action       = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep last 10 tagged images"
+        selection    = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 10 }
+        action       = { type = "expire" }
+      }
+    ]
+  })
+}
+
+// NOTE: No per-tenant RDS anymore. All tenants share aws_db_instance.moodle.
+// Each tenant gets its OWN database + scoped user ON that shared instance,
+// created by the container at startup via the MYSQL_CLIENT_CREATE_* vars
+// in the task definition below (your logs already show the image validates
+// MYSQL_CLIENT_* env vars, so this path is supported).
 
 // ── Tenant Log Groups ─────────────────────
 resource "aws_cloudwatch_log_group" "tenant" {
@@ -139,25 +131,41 @@ resource "aws_ecs_task_definition" "tenant" {
   container_definitions = jsonencode([
     {
       name         = "moodle"
-      image        = each.value.image // per-tenant image, NOT hardcoded
+      image        = "${aws_ecr_repository.tenant[each.key].repository_url}:${each.value.image_tag}"
       portMappings = [{ containerPort = 8080, protocol = "tcp" }]
 
       environment = [
         { name = "MOODLE_DATABASE_TYPE", value = "mysqli" },
-        { name = "MOODLE_DATABASE_HOST", value = aws_db_instance.tenant[each.key].address },
+        // ── App connects to its OWN database/user on the SHARED instance ──
+        { name = "MOODLE_DATABASE_HOST", value = aws_db_instance.moodle.address },
         { name = "MOODLE_DATABASE_PORT_NUMBER", value = tostring(var.db_port) },
-        { name = "MOODLE_DATABASE_NAME", value = each.value.db_name },
-        { name = "MOODLE_DATABASE_USER", value = each.value.db_username },
+        { name = "MOODLE_DATABASE_NAME", value = each.key },
+        { name = "MOODLE_DATABASE_USER", value = "${each.key}_user" },
         { name = "MOODLE_DATABASE_PASSWORD", value = var.client_secrets[each.key].db_password },
+        // ── Create that database + user on first boot, using the shared
+        //    RDS master credential as "root". (See isolation note in chat.) ──
+        { name = "MYSQL_CLIENT_FLAVOR", value = "mysql" },
+        { name = "MYSQL_CLIENT_DATABASE_HOST", value = aws_db_instance.moodle.address },
+        { name = "MYSQL_CLIENT_DATABASE_PORT_NUMBER", value = tostring(var.db_port) },
+        { name = "MYSQL_CLIENT_DATABASE_ROOT_USER", value = var.db_master_username },
+        { name = "MYSQL_CLIENT_DATABASE_ROOT_PASSWORD", value = var.db_master_password },
+        { name = "MYSQL_CLIENT_CREATE_DATABASE_NAME", value = each.key },
+        { name = "MYSQL_CLIENT_CREATE_DATABASE_USER", value = "${each.key}_user" },
+        { name = "MYSQL_CLIENT_CREATE_DATABASE_PASSWORD", value = var.client_secrets[each.key].db_password },
+        { name = "MYSQL_CLIENT_CREATE_DATABASE_CHARACTER_SET", value = "utf8mb4" },
+        { name = "MYSQL_CLIENT_CREATE_DATABASE_COLLATE", value = "utf8mb4_unicode_ci" },
+        // ── Moodle site ──
         { name = "MOODLE_USERNAME", value = each.value.admin_user },
         { name = "MOODLE_PASSWORD", value = var.client_secrets[each.key].admin_password },
         { name = "MOODLE_EMAIL", value = each.value.admin_email },
         { name = "MOODLE_SITE_NAME", value = each.value.site_name },
         { name = "MOODLE_URL", value = "https://${each.value.subdomain}.${var.saas_domain}" },
         { name = "MOODLE_SKIP_BOOTSTRAP", value = "no" },
-        { name = "BITNAMI_DEBUG", value = "true" }
+        { name = "BITNAMI_DEBUG", value = "true" },
         // Moodle sits behind the ALB which terminates TLS — without these
         // it builds http:// URLs and can redirect-loop after it boots.
+        { name = "MOODLE_REVERSEPROXY", value = "yes" },
+        { name = "MOODLE_SSLPROXY", value = "yes" }
       ]
 
       // Send stdout/stderr to CloudWatch so failures are visible.
@@ -222,6 +230,11 @@ output "tenant_urls" {
     { oneconnect = "https://${var.production_url}" },
     { for k, c in var.new_clients : k => "https://${c.subdomain}.${var.saas_domain}" }
   )
+}
+
+output "tenant_ecr_repos" {
+  description = "Push each client's image to its repo, then run tenant_force_deploy"
+  value       = { for k, r in aws_ecr_repository.tenant : k => r.repository_url }
 }
 
 output "tenant_force_deploy" {
